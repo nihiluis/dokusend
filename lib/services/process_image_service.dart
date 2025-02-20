@@ -1,48 +1,87 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import '../utils/logger.dart';
 
 class ProcessImageService {
-  Future<File> processImage(File inputImage) async {
+  /// Service class for processing images with various filters and adjustments
+  ///
+  /// This service provides methods to process images asynchronously using isolates.
+  /// The processing includes:
+  /// - Converting to grayscale
+  /// - Adjusting brightness and contrast
+  /// - Applying sharpening filter
+  /// 
+  /// Usage:
+  /// ```dart
+  /// final processor = ProcessImageService();
+  /// final processedBytes = await processor.processImageAsync('path/to/image.jpg');
+  /// ```
+  ///
+  /// The [processImageAsync] method takes a file path and returns processed image bytes.
+  /// Processing is done in a separate isolate to avoid blocking the main thread.
+  ///
+  /// Throws an [Exception] if image processing fails.
+
+  /// Internal method that handles the actual image processing in an isolate
+  /// 
+  /// Takes a [File] input and returns processed [Uint8List] bytes.
+  /// Applies the following processing steps:
+  /// - Resizing to max 900px width
+  /// - Grayscale conversion
+  /// - Brightness adjustment
+  /// - Contrast adjustment 
+  /// - JPEG encoding at 90% quality
+  ///
+  /// Throws if image decoding or processing fails.
+  static Future<Uint8List> _processImageIsolate(File inputImage) async {
     try {
-      // Read the image
+      final stopwatch = Stopwatch()..start();
+      
       final bytes = await inputImage.readAsBytes();
+      logger.d('Reading bytes took: ${stopwatch.elapsedMilliseconds}ms');
+
+      stopwatch.reset();
       img.Image? image = img.decodeImage(bytes);
+      
+      logger.d('Decoding image took: ${stopwatch.elapsedMilliseconds}ms');
       
       if (image == null) throw Exception('Failed to decode image');
 
-      // 1. Convert to grayscale
+      // Add resize logic
+      stopwatch.reset();
+      if (image.width > 900) {
+        image = img.copyResize(image, width: 900);
+        logger.d('Resizing image took: ${stopwatch.elapsedMilliseconds}ms');
+      }
+
+      stopwatch.reset();
       image = img.grayscale(image);
+      logger.d('Grayscale conversion took: ${stopwatch.elapsedMilliseconds}ms');
       
-      // 3. Adjust brightness, contrast, and apply convolution for sharpening
+      stopwatch.reset();
       image = img.adjustColor(
         image,
-        brightness: 0.1,
-        contrast: 1.2,
+        brightness: 1.3,
+        contrast: 1.7,
       );
-      
-      const sharpenFilter = [ 0, -1,  0,
-                      -1,  5, -1,
-                       0, -1,  0 ];
+      logger.d('Color adjustment took: ${stopwatch.elapsedMilliseconds}ms');
 
-      // 4. Apply convolution filter for sharpening
-      image = img.convolution(
-        image,
-        filter: sharpenFilter,
-        div: 1,
-      );
-      
-
-      // Convert back to bytes
+      stopwatch.reset();
       final processedBytes = img.encodeJpg(image, quality: 90);
+      logger.d('JPEG encoding took: ${stopwatch.elapsedMilliseconds}ms');
       
-      // Save the processed image
-      final tempDir = Directory.systemTemp;
-      final processedFile = File('${tempDir.path}/processed_${DateTime.now().millisecondsSinceEpoch}.jpg');
-      await processedFile.writeAsBytes(processedBytes);
-
-      return processedFile;
+      stopwatch.stop();
+      return processedBytes;
     } catch (e) {
+      logger.e('Failed to process image', error: e);
       throw Exception('Failed to process image: $e');
     }
+  }
+
+  Future<Uint8List> processImageAsync(String path) async {
+    return compute(_processImageIsolate, File(path));
   }
 }

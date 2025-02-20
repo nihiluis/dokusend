@@ -1,8 +1,13 @@
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:dokusend/services/process_image_service.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import '../services/file_upload_service.dart';
 import '../utils/logger.dart';
 import '../components/button.dart';
+import '../components/image_display.dart';
 
 class UploadPage extends StatefulWidget {
   const UploadPage({super.key});
@@ -13,20 +18,27 @@ class UploadPage extends StatefulWidget {
 
 class _UploadPageState extends State<UploadPage> {
   late FileUploadService _uploadService;
-  FilePickerResult? selectedFile;
+  late ProcessImageService _processService;
+
+  FilePickerResult? pickedFileData;
+  Uint8List? processedFileBytes;
+  int currentStep = 0;
+
   bool isUploading = false;
+  bool isProcessing = false;
   String selectedDocumentType = 'image';
 
   @override
   void initState() {
     super.initState();
     _uploadService = ImageUploadService();
+    _processService = ProcessImageService();
   }
 
   void _updateService(String type) {
     setState(() {
       selectedDocumentType = type;
-      selectedFile = null; // Clear selected file when changing type
+      pickedFileData = null; // Clear selected file when changing type
       _uploadService =
           type == 'image' ? ImageUploadService() : TextFileUploadService();
     });
@@ -37,16 +49,44 @@ class _UploadPageState extends State<UploadPage> {
       final result = await _uploadService.pickFile();
       if (result != null) {
         setState(() {
-          selectedFile = result;
+          pickedFileData = result;
         });
       }
+
+      await processFile();
     } catch (e) {
       _showAlert('Error', 'Failed to pick file: $e');
     }
   }
 
+  Future<void> processFile() async {
+    if (pickedFileData == null) {
+      _showAlert('Error', 'Please select a file first');
+      return;
+    }
+
+    setState(() {
+      isProcessing = true;
+    });
+
+    try {
+      final inputFilePath = pickedFileData!.files.first.path!;
+      final result = await _processService.processImageAsync(inputFilePath);
+
+      setState(() {
+        processedFileBytes = result;
+      });
+    } catch (e) {
+      _showAlert('Error', 'Failed to process file: $e');
+    } finally {
+      setState(() {
+        isProcessing = false;
+      });
+    }
+  }
+
   Future<void> uploadFile() async {
-    if (selectedFile == null) {
+    if (pickedFileData == null) {
       _showAlert('Error', 'Please select a file first');
       return;
     }
@@ -56,10 +96,10 @@ class _UploadPageState extends State<UploadPage> {
     });
 
     try {
-      await _uploadService.uploadFile(selectedFile!);
+      await _uploadService.uploadFile(pickedFileData!);
       _showAlert('Success', 'File uploaded successfully');
       setState(() {
-        selectedFile = null;
+        pickedFileData = null;
       });
     } catch (e) {
       logger.e('Upload error $e');
@@ -100,22 +140,43 @@ class _UploadPageState extends State<UploadPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              selectedFile == null
-                  ? FileSelectionView(
-                      selectedDocumentType: selectedDocumentType,
-                      onUpdateService: _updateService,
-                      onPickFile: pickFile,
-                    )
-                  : FilePreviewView(
-                      file: selectedFile!,
-                      onDelete: () => setState(() => selectedFile = null),
-                      onProcess: uploadFile,
-                    ),
+              _buildCurrentStep(),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildCurrentStep() {
+    switch (currentStep) {
+      case 0:
+        return FileSelectionView(
+          selectedDocumentType: selectedDocumentType,
+          onUpdateService: _updateService,
+          onPickFile: () {
+            pickFile().then((_) {
+              if (pickedFileData != null) {
+                setState(() => currentStep = 1);
+              }
+            });
+          },
+          isLoading: isProcessing,
+        );
+      case 1:
+        return FilePreviewView(
+          file: pickedFileData!,
+          onDelete: () => setState(() {
+            pickedFileData = null;
+            processedFileBytes = null;
+            currentStep = 0;
+          }),
+          onUpload: uploadFile,
+          processedFileBytes: processedFileBytes!,
+        );
+      default:
+        return const SizedBox.shrink();
+    }
   }
 }
 
@@ -123,12 +184,14 @@ class FileSelectionView extends StatelessWidget {
   final String selectedDocumentType;
   final void Function(String) onUpdateService;
   final VoidCallback onPickFile;
+  final bool isLoading;
 
   const FileSelectionView({
     super.key,
     required this.selectedDocumentType,
     required this.onUpdateService,
     required this.onPickFile,
+    required this.isLoading,
   });
 
   @override
@@ -167,6 +230,7 @@ class FileSelectionView extends StatelessWidget {
         CustomButton(
           text: 'Pick',
           onPressed: onPickFile,
+          isLoading: isLoading,
           variant: ButtonVariant.primary,
         ),
       ],
@@ -176,20 +240,28 @@ class FileSelectionView extends StatelessWidget {
 
 class FilePreviewView extends StatelessWidget {
   final FilePickerResult file;
+  final Uint8List processedFileBytes;
   final VoidCallback onDelete;
-  final VoidCallback onProcess;
+  final VoidCallback onUpload;
 
   const FilePreviewView({
     super.key,
     required this.file,
+    required this.processedFileBytes,
     required this.onDelete,
-    required this.onProcess,
+    required this.onUpload,
   });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
+        const SizedBox(height: 16),
+        ImageDisplay(
+          imageBytes: processedFileBytes,
+          previewHeight: 300,
+          previewWidth: 300,
+        ),
         const SizedBox(height: 20),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -210,8 +282,8 @@ class FilePreviewView extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         CustomButton(
-          text: 'Process',
-          onPressed: onProcess,
+          text: 'Upload',
+          onPressed: onUpload,
           variant: ButtonVariant.primary,
         ),
       ],
