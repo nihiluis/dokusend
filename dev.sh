@@ -1,0 +1,1 @@
+flutter run --dart-define=DEV_MODE=true
