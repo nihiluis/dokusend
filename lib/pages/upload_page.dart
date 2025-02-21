@@ -1,13 +1,13 @@
-import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:dokusend/services/document/image_document_service.dart';
 import 'package:dokusend/services/process_image_service.dart';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import '../services/file_upload_service.dart';
 import '../utils/logger.dart';
 import '../components/button.dart';
 import '../components/image_display.dart';
+import '../services/document/document_file_service.dart';
 
 class UploadPage extends StatefulWidget {
   const UploadPage({super.key});
@@ -17,8 +17,8 @@ class UploadPage extends StatefulWidget {
 }
 
 class _UploadPageState extends State<UploadPage> {
-  late FileUploadService _uploadService;
   late ProcessImageService _processService;
+  late ImageDocumentService _imageDocumentService;
 
   FilePickerResult? pickedFileData;
   Uint8List? processedFileBytes;
@@ -31,22 +31,20 @@ class _UploadPageState extends State<UploadPage> {
   @override
   void initState() {
     super.initState();
-    _uploadService = ImageUploadService();
     _processService = ProcessImageService();
   }
 
   void _updateService(String type) {
     setState(() {
       selectedDocumentType = type;
-      pickedFileData = null; // Clear selected file when changing type
-      _uploadService =
-          type == 'image' ? ImageUploadService() : TextFileUploadService();
+      pickedFileData = null;
+      _imageDocumentService = ImageDocumentService();
     });
   }
 
   Future<void> pickFile() async {
     try {
-      final result = await _uploadService.pickFile();
+      final result = await DocumentFileService.pickFile();
       if (result != null) {
         setState(() {
           pickedFileData = result;
@@ -55,13 +53,14 @@ class _UploadPageState extends State<UploadPage> {
 
       await processFile();
     } catch (e) {
-      _showAlert('Error', 'Failed to pick file: $e');
+      logger.e('Failed to pick and process file: $e');
+      _showAlert('Error', 'Failed to pick file.');
     }
   }
 
   Future<void> processFile() async {
     if (pickedFileData == null) {
-      _showAlert('Error', 'Please select a file first');
+      _showAlert('Error', 'Please select a file.');
       return;
     }
 
@@ -77,7 +76,7 @@ class _UploadPageState extends State<UploadPage> {
         processedFileBytes = result;
       });
     } catch (e) {
-      _showAlert('Error', 'Failed to process file: $e');
+      _showAlert('Error', 'Failed to process file.');
     } finally {
       setState(() {
         isProcessing = false;
@@ -85,9 +84,22 @@ class _UploadPageState extends State<UploadPage> {
     }
   }
 
-  Future<void> uploadFile() async {
+  Future<void> analyzeDocument() async {
     if (pickedFileData == null) {
-      _showAlert('Error', 'Please select a file first');
+      _showAlert('Error', 'Please select a file.');
+      return;
+    }
+
+    if (selectedDocumentType == 'image') {
+      await analyzeImage();
+    } else {
+      await analyzeDocument();
+    }
+  }
+
+  Future<void> analyzeImage() async {
+    if (pickedFileData == null || processedFileBytes == null) {
+      _showAlert('Error', 'Please select a file.');
       return;
     }
 
@@ -96,14 +108,15 @@ class _UploadPageState extends State<UploadPage> {
     });
 
     try {
-      await _uploadService.uploadFile(pickedFileData!);
-      _showAlert('Success', 'File uploaded successfully');
+      await _imageDocumentService.analyzeImage(
+          pickedFileData!.files.first.path!, processedFileBytes!);
+
       setState(() {
         pickedFileData = null;
       });
     } catch (e) {
-      logger.e('Upload error $e');
-      _showAlert('Error', 'Failed to upload file: $e');
+      logger.e('Analyze image error $e');
+      _showAlert('Error', 'Failed to analyze image.');
     } finally {
       setState(() {
         isUploading = false;
@@ -171,7 +184,7 @@ class _UploadPageState extends State<UploadPage> {
             processedFileBytes = null;
             currentStep = 0;
           }),
-          onUpload: uploadFile,
+          onUpload: analyzeDocument,
           processedFileBytes: processedFileBytes!,
         );
       default:
