@@ -1,11 +1,11 @@
-import 'package:dokusend/database/document_metadata.dart';
+import 'package:dokusend/database/document.dart';
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:path_provider/path_provider.dart';
 
 part 'database.g.dart';
 
-@DriftDatabase(tables: [DocumentMetadata])
+@DriftDatabase(tables: [DocumentMetadata, DocumentJob])
 class DokuDb extends _$DokuDb {
   DokuDb._() : super(_openConnection());
 

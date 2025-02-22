@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:dokusend/services/document/document_service.dart';
 import 'package:dokusend/services/document/image_document_service.dart';
 import 'package:dokusend/services/process_image_service.dart';
 import 'package:flutter/material.dart';
@@ -32,6 +33,7 @@ class _UploadPageState extends State<UploadPage> {
   void initState() {
     super.initState();
     _processService = ProcessImageService();
+    _imageDocumentService = ImageDocumentService();
   }
 
   void _updateService(String type) {
@@ -52,8 +54,9 @@ class _UploadPageState extends State<UploadPage> {
       }
 
       await processFile();
-    } catch (e) {
-      logger.e('Failed to pick and process file: $e');
+    } catch (e, stackTrace) {
+      logger.e('Failed to pick and process file',
+          error: e, stackTrace: stackTrace);
       _showAlert('Error', 'Failed to pick file.');
     }
   }
@@ -75,7 +78,8 @@ class _UploadPageState extends State<UploadPage> {
       setState(() {
         processedFileBytes = result;
       });
-    } catch (e) {
+    } catch (e, stackTrace) {
+      logger.e('Process file error', error: e, stackTrace: stackTrace);
       _showAlert('Error', 'Failed to process file.');
     } finally {
       setState(() {
@@ -84,20 +88,23 @@ class _UploadPageState extends State<UploadPage> {
     }
   }
 
+  /// Currently always creates a new document, not possible to append to existing document.
   Future<void> analyzeDocument() async {
     if (pickedFileData == null) {
       _showAlert('Error', 'Please select a file.');
       return;
     }
 
+    final documentId = await DocumentService().createEmptyDocument();
+
     if (selectedDocumentType == 'image') {
-      await analyzeImage();
+      await analyzeImage(documentId);
     } else {
       await analyzeDocument();
     }
   }
 
-  Future<void> analyzeImage() async {
+  Future<void> analyzeImage(documentId) async {
     if (pickedFileData == null || processedFileBytes == null) {
       _showAlert('Error', 'Please select a file.');
       return;
@@ -109,13 +116,13 @@ class _UploadPageState extends State<UploadPage> {
 
     try {
       await _imageDocumentService.analyzeImage(
-          pickedFileData!.files.first.path!, processedFileBytes!);
+          documentId, pickedFileData!.files.first.path!, processedFileBytes!);
 
       setState(() {
         pickedFileData = null;
       });
-    } catch (e) {
-      logger.e('Analyze image error $e');
+    } catch (e, stackTrace) {
+      logger.e('Analyze image error', error: e, stackTrace: stackTrace);
       _showAlert('Error', 'Failed to analyze image.');
     } finally {
       setState(() {

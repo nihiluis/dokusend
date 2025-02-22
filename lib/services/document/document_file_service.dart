@@ -12,25 +12,25 @@ class DocumentFileService {
     );
   }
 
-  static Future<String> getDocumentPath(String documentId) async {
+  static Future<String> getDocumentPath(int documentId) async {
     final directory = await getApplicationSupportDirectory();
-    return path.join(directory.path, documentId);
+    return path.join(directory.path, documentId.toString());
   }
 
-  static Future<void> initDocument(String documentId) async {
+  static Future<void> initDocument(int documentId) async {
     final documentPath = await getDocumentPath(documentId);
     await Directory(documentPath).create(recursive: true);
   }
 
   static Future<void> copyFileToDocument(
-      String documentId, String fileName, String sourcePath) async {
+      int documentId, String fileName, String sourcePath) async {
     final documentPath = await getDocumentPath(documentId);
     final filePath = path.join(documentPath, fileName);
     await File(sourcePath).copy(filePath);
   }
 
   static Future<void> saveFileToDocument(
-      String documentId, String fileName, Uint8List fileBytes) async {
+      int documentId, String fileName, Uint8List fileBytes) async {
     final documentPath = await getDocumentPath(documentId);
     final filePath = path.join(documentPath, fileName);
     await File(filePath).writeAsBytes(fileBytes);

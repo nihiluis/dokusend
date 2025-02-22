@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 
+import 'package:dokusend/database/document.dart';
 import 'package:dokusend/services/file_utils.dart';
+import 'package:drift/drift.dart';
 import 'package:http/http.dart' as http;
 import '../../config.dart';
 import '../../utils/logger.dart';
@@ -8,8 +10,8 @@ import 'document_file_service.dart';
 import 'dart:convert';
 
 class AnalyzeImageResult {
-  final String documentId;
-  final String imageId;
+  final int documentId;
+  final int imageId;
   final String jobId;
 
   AnalyzeImageResult({
@@ -20,18 +22,26 @@ class AnalyzeImageResult {
 }
 
 class ImageDocumentService {
+  final DocumentMetadataRepository documentMetadataRepository;
+  final DocumentJobRepository documentJobRepository;
+
+  ImageDocumentService()
+      : documentMetadataRepository = DocumentMetadataRepository(),
+        documentJobRepository = DocumentJobRepository();
+
   Future<AnalyzeImageResult> analyzeImage(
-      String filepath, Uint8List fileBytes) async {
+      int documentId, String filepath, Uint8List fileBytes) async {
     var request = http.MultipartRequest(
       'POST',
-      Uri.parse('${Config.documentUnderstandingApiUrl.value}/api/v1/image'),
+      Uri.parse(
+          '${Config.documentUnderstandingApiUrl.value}/api/v1/document/$documentId/image'),
     );
 
     final filename = FileUtils.getFilename(filepath);
 
     request.files.add(
       http.MultipartFile.fromBytes(
-        'file',
+        'image',
         fileBytes,
         filename: filename,
       ),
@@ -41,7 +51,9 @@ class ImageDocumentService {
     logger.i('Upload response status: ${response.statusCode}');
 
     if (response.statusCode != 200) {
-      logger.e('Image upload failed: Status code: ${response.statusCode}');
+      final responseBody = await response.stream.bytesToString();
+      logger.e(
+          'Image upload failed: Status code: ${response.statusCode}, Response body: $responseBody');
       throw UploadException(
           'Upload failed with status: ${response.statusCode}');
     }
@@ -49,16 +61,16 @@ class ImageDocumentService {
     final responseBody = await response.stream.bytesToString();
     final jsonResponse = json.decode(responseBody);
 
-    logger.i('Image uploaded successfully');
+    logger.i('Image uploaded successfully, received response: $jsonResponse');
 
-    final documentId = jsonResponse['documentId'];
     final imageId = jsonResponse['imageId'];
-    final jobId = jsonResponse['jobId'];
-
+    String jobId = jsonResponse['jobId'];
 
     final originalFilename = FileUtils.getFilename(filepath);
     final processedFilename =
         FileUtils.appendToFilename(originalFilename, '_processed');
+
+    await documentJobRepository.create(jobId, documentId);
 
     await DocumentFileService.initDocument(documentId);
     await DocumentFileService.copyFileToDocument(
