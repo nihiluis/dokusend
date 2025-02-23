@@ -8,6 +8,9 @@ class Config {
       ValueNotifier(
           devMode ? 'http://localhost:3000' : 'https://production.com/analyze');
 
+  static final ValueNotifier<String> jobApiUrl = ValueNotifier(
+      devMode ? 'http://localhost:8080' : 'https://production.com/analyze');
+
   // Prevent instantiation
   Config._();
 }

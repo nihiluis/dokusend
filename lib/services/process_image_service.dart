@@ -1,8 +1,6 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import '../utils/logger.dart';
 
 class ProcessImageService {

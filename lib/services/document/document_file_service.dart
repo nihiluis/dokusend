@@ -4,6 +4,7 @@ import 'package:path/path.dart' as path;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class DocumentFileService {
   static Future<FilePickerResult?> pickFile() async {
@@ -15,6 +16,11 @@ class DocumentFileService {
   static Future<String> getDocumentPath(int documentId) async {
     final directory = await getApplicationSupportDirectory();
     return path.join(directory.path, documentId.toString());
+  }
+
+  static Future<void> openDocumentIdDirectory(int documentId) async {
+    final documentPath = await getDocumentPath(documentId);
+    await launchUrl(Uri.file(documentPath));
   }
 
   static Future<void> initDocument(int documentId) async {

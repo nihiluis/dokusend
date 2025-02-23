@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:dokusend/database/document_metadata.dart';
 import 'package:dokusend/services/document/document_service.dart';
 import 'package:dokusend/services/document/image_document_service.dart';
 import 'package:dokusend/services/process_image_service.dart';
@@ -41,6 +42,16 @@ class _UploadPageState extends State<UploadPage> {
       selectedDocumentType = type;
       pickedFileData = null;
       _imageDocumentService = ImageDocumentService();
+    });
+  }
+
+  void resetState() {
+    setState(() {
+      pickedFileData = null;
+      processedFileBytes = null;
+      currentStep = 0;
+      isUploading = false;
+      isProcessing = false;
     });
   }
 
@@ -95,7 +106,8 @@ class _UploadPageState extends State<UploadPage> {
       return;
     }
 
-    final documentId = await DocumentService().createEmptyDocument();
+    final documentId = await DocumentService().createEmptyDocument(
+        selectedDocumentType == 'image' ? DocumentType.image : DocumentType.textFile);
 
     if (selectedDocumentType == 'image') {
       await analyzeImage(documentId);
@@ -115,12 +127,10 @@ class _UploadPageState extends State<UploadPage> {
     });
 
     try {
-      await _imageDocumentService.analyzeImage(
+      await _imageDocumentService.apiAnalyzeImage(
           documentId, pickedFileData!.files.first.path!, processedFileBytes!);
 
-      setState(() {
-        pickedFileData = null;
-      });
+      _finalizeUpload();
     } catch (e, stackTrace) {
       logger.e('Analyze image error', error: e, stackTrace: stackTrace);
       _showAlert('Error', 'Failed to analyze image.');
@@ -129,6 +139,15 @@ class _UploadPageState extends State<UploadPage> {
         isUploading = false;
       });
     }
+  }
+
+  void _finalizeUpload() {
+    resetState();
+    Navigator.pushNamedAndRemoveUntil(
+      context,
+      '/',
+      (route) => false,
+    );
   }
 
   void _showAlert(String title, String message) {
@@ -193,6 +212,7 @@ class _UploadPageState extends State<UploadPage> {
           }),
           onUpload: analyzeDocument,
           processedFileBytes: processedFileBytes!,
+          isUploading: isUploading,
         );
       default:
         return const SizedBox.shrink();
@@ -263,6 +283,7 @@ class FilePreviewView extends StatelessWidget {
   final Uint8List processedFileBytes;
   final VoidCallback onDelete;
   final VoidCallback onUpload;
+  final bool isUploading;
 
   const FilePreviewView({
     super.key,
@@ -270,6 +291,7 @@ class FilePreviewView extends StatelessWidget {
     required this.processedFileBytes,
     required this.onDelete,
     required this.onUpload,
+    required this.isUploading,
   });
 
   @override
@@ -305,6 +327,7 @@ class FilePreviewView extends StatelessWidget {
           text: 'Upload',
           onPressed: onUpload,
           variant: ButtonVariant.primary,
+          isLoading: isUploading,
         ),
       ],
     );

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -33,6 +35,11 @@ class FileUtils {
     } catch (e) {
       throw DirectoryException('Failed to open directory: $e');
     }
+  }
+
+  static Future<void> writeToFile(String dir, String filename, String content) async {
+    final file = File(path.join(dir, filename));
+    await file.writeAsString(content);
   }
 }
 

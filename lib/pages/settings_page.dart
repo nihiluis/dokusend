@@ -9,25 +9,35 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  late TextEditingController _apiUrlController;
+  late TextEditingController _documentApiUrlController;
+  late TextEditingController _jobApiUrlController;
 
   @override
   void initState() {
     super.initState();
-    _apiUrlController = TextEditingController(text: Config.documentUnderstandingApiUrl.value);
+    _documentApiUrlController =
+        TextEditingController(text: Config.documentUnderstandingApiUrl.value);
+    _jobApiUrlController = TextEditingController(text: Config.jobApiUrl.value);
   }
 
   @override
   void dispose() {
-    _apiUrlController.dispose();
+    _documentApiUrlController.dispose();
     super.dispose();
   }
 
-  void _updateApiUrl() {
-    if (_apiUrlController.text.isNotEmpty) {
-      Config.documentUnderstandingApiUrl.value = _apiUrlController.text;
+  void _updateSettings() {
+    if (_documentApiUrlController.text.isNotEmpty) {
+      Config.documentUnderstandingApiUrl.value = _documentApiUrlController.text;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('API URL updated')),
+      );
+    }
+
+    if (_jobApiUrlController.text.isNotEmpty) {
+      Config.jobApiUrl.value = _jobApiUrlController.text;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Job API URL updated')),
       );
     }
   }
@@ -82,18 +92,35 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                     const SizedBox(height: 16),
                     TextField(
-                      controller: _apiUrlController,
+                      controller: _documentApiUrlController,
                       decoration: const InputDecoration(
-                        labelText: 'API URL',
-                        hintText: 'Enter the API URL',
+                        labelText: 'Document API URL',
+                        hintText: 'Enter the DocumentAPI URL',
                         border: OutlineInputBorder(),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Job API',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _jobApiUrlController,
+                      decoration: const InputDecoration(
+                        labelText: 'Job API URL',
+                        hintText: 'Enter the Job API URL',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
                     Align(
                       alignment: Alignment.centerRight,
                       child: ElevatedButton(
-                        onPressed: _updateApiUrl,
+                        onPressed: _updateSettings,
                         child: const Text('Save'),
                       ),
                     ),
@@ -106,4 +133,4 @@ class _SettingsPageState extends State<SettingsPage> {
       ),
     );
   }
-} 
+}
