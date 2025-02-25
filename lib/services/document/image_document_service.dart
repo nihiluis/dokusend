@@ -4,7 +4,9 @@ import 'package:dokusend/database/document_image.dart';
 import 'package:dokusend/database/document_metadata.dart';
 import 'package:dokusend/database/document_job.dart';
 import 'package:dokusend/services/file_utils.dart';
+import 'package:dokusend/utils/dedent.dart';
 import 'package:dokusend/utils/exceptions.dart';
+import 'package:dokusend/utils/markdown.dart';
 import 'package:http/http.dart' as http;
 import '../../config.dart';
 import '../../utils/logger.dart';
@@ -32,6 +34,7 @@ class ImageDataResponseBody {
   final List<String> tags;
   final String? title;
   final String? caption;
+  final String? slug;
 
   ImageDataResponseBody({
     required this.imageId,
@@ -42,6 +45,7 @@ class ImageDataResponseBody {
     this.tags = const [],
     this.title,
     this.caption,
+    this.slug,
   });
 
   factory ImageDataResponseBody.fromJson(Map<String, dynamic> json) {
@@ -55,6 +59,7 @@ class ImageDataResponseBody {
       tags: List<String>.from(imageText['tags'] ?? []),
       title: imageText['title'],
       caption: imageText['caption'],
+      slug: imageText['slug'],
     );
   }
 }
@@ -120,19 +125,26 @@ class ImageDocumentService {
         documentId, imageData.caption ?? '');
 
     final documentPath = await DocumentFileService.getDocumentPath(documentId);
-    if (imageData.formattedText != null) {
-      await FileUtils.writeToFile(
-          documentPath, 'formattedText.md', imageData.formattedText!);
-    }
+    final formattedText = imageData.formattedText ?? '';
+    final slug = imageData.slug ??
+        imageData.title?.toLowerCase().replaceAll(' ', '-') ??
+        'untitled';
+    var markdownHeaders = {
+      'title': imageData.title,
+      'caption': imageData.caption,
+      'slug': slug,
+      'tags': imageData.tags.join(', '),
+      'documentId': documentId,
+      'imageId': imageId,
+      'imageCreatedAt': documentImage.createdAt,
+    };
+    var markdownText =
+        createMarkdownHeader(markdownHeaders) + dedent(formattedText);
+    await FileUtils.writeToFile(documentPath, '$slug.md', markdownText);
 
     if (imageData.representation != null) {
-      await FileUtils.writeToFile(documentPath, 'imageRepresentation.json',
-          json.encode(imageData.representation));
-    }
-
-    if (imageData.tags.isNotEmpty) {
-      await FileUtils.writeToFile(documentPath, 'suggestedTags.json',
-          json.encode(imageData.tags));
+      await FileUtils.writeToFile(
+          documentPath, '$slug.json', json.encode(imageData.representation));
     }
   }
 

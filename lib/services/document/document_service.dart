@@ -42,6 +42,7 @@ class DocumentService {
     if (documentInfo.isPending() || documentInfo.isProcessing()) {
       final remoteJobData =
           await _jobService.getJobData(documentInfo.firstJob!.id);
+        
       if (remoteJobData.status == RemoteJobStatus.failed) {
         await _documentJobRepository.updateStatus(
             documentInfo.firstJob!.id, DocumentJobStatus.failed);
