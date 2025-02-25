@@ -23,6 +23,7 @@ class _HomePageState extends State<HomePage> {
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(widget.title),
+        toolbarHeight: 40,
         actions: [
           IconButton(
             icon: const Icon(Icons.sync),
